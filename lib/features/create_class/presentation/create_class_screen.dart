@@ -31,6 +31,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
   final List<_EditableSongEntry> _postSongs = [];
   ClassModel? _originalClass;
   bool _isDirty = false;
+  _ClipboardSong? _clipboard;
   @override
   void initState() {
     super.initState();
@@ -156,10 +157,10 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
         );
         return;
       }
-      if (_workoutSongs.isEmpty) {
+      if (_preSongs.isEmpty && _workoutSongs.isEmpty && _postSongs.isEmpty) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Add at least one workout song.')),
+          const SnackBar(content: Text('Add at least one song.')),
         );
         return;
       }
@@ -232,6 +233,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
       Duration.zero,
       (acc, entry) => acc + entry.song.duration,
     );
+    final hasClipboard = _clipboard != null;
 
     final sections = [
       _PlaylistSectionConfig(
@@ -301,10 +303,21 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-              child: FilledButton(
-                onPressed: _canSave ? handleSave : null,
-                child: const Text('Save'),
-              ),
+              child: _canSave
+                  ? FilledButton(
+                      onPressed: handleSave,
+                      child: const Text('Save'),
+                    )
+                  : GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _showSaveRequirements,
+                      child: AbsorbPointer(
+                        child: FilledButton(
+                          onPressed: null,
+                          child: const Text('Save'),
+                        ),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -375,6 +388,12 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                   child: _PlaylistEditor(
                   config: section,
                   onAddSong: () => handleAddSong(section.kind),
+                  canPaste: hasClipboard,
+                  onPasteSong: hasClipboard
+                      ? () {
+                          _handlePasteSong(section.kind);
+                        }
+                      : null,
                   onDeleteSong: (index) => setState(() {
                     final list = _entriesFor(section.kind);
                     if (index >= 0 && index < list.length) {
@@ -396,6 +415,13 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                     _reindex(list);
                     _isDirty = true;
                   }),
+                  onEntryLongPress: (entry, index, position) =>
+                      _handleSongContextMenu(
+                        section.kind,
+                        entry,
+                        index,
+                        position,
+                      ),
                   onEditCues: (entry) => handleEditCues(section.kind, entry),
                 ),
               ),
@@ -494,7 +520,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     }
   }
   void _handleNameChanged() {
-    if (!mounted) {
+    if (!context.mounted) {
       return;
     }
     setState(() {
@@ -538,6 +564,135 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
       });
     }
     return shouldDiscard;
+  }
+
+  void _showSaveRequirements() {
+    if (!mounted) {
+      return;
+    }
+    final requirements = <String>[];
+    if (_nameController.text.trim().isEmpty) {
+      requirements.add('Add a class name.');
+    }
+    if (_preSongs.isEmpty && _workoutSongs.isEmpty && _postSongs.isEmpty) {
+      requirements.add('Add at least one song.');
+    }
+    if (requirements.isEmpty) {
+      requirements.add('Ready to save.');
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(requirements.join('\n'))),
+    );
+  }
+
+  Future<void> _handleSongContextMenu(
+    PlaylistKind kind,
+    _EditableSongEntry entry,
+    int index,
+    Offset position,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+    final overlay = Overlay.of(context);
+    final renderBox = overlay.context.findRenderObject() as RenderBox?;
+    final menuPosition = renderBox == null
+        ? RelativeRect.fill
+        : RelativeRect.fromRect(
+            Rect.fromLTWH(position.dx, position.dy, 0, 0),
+            Offset.zero & renderBox.size,
+          );
+    final clipboardAvailable = _clipboard != null;
+    final action = await showMenu<_SongContextAction>(
+      context: context,
+      position: menuPosition,
+      items: [
+        const PopupMenuItem<_SongContextAction>(
+          value: _SongContextAction.copy,
+          child: Text('Copy song'),
+        ),
+        if (clipboardAvailable)
+          const PopupMenuItem<_SongContextAction>(
+            value: _SongContextAction.pasteAbove,
+            child: Text('Paste above'),
+          ),
+        if (clipboardAvailable)
+          const PopupMenuItem<_SongContextAction>(
+            value: _SongContextAction.pasteBelow,
+            child: Text('Paste below'),
+          ),
+      ],
+    );
+    if (!mounted) {
+      return;
+    }
+    switch (action) {
+      case _SongContextAction.copy:
+        final cueRepo = ref.read(cueRepositoryProvider);
+        final cueCount = cueRepo.list(entry.song.id).length;
+        setState(() {
+          _clipboard = _ClipboardSong(song: entry.song);
+        });
+        final cueSuffix = cueCount == 0
+            ? ''
+            : ' with $cueCount cue${cueCount == 1 ? '' : 's'}';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Copied "${entry.song.title}"$cueSuffix.')),
+        );
+        break;
+      case _SongContextAction.pasteAbove:
+        await _handlePasteSong(kind, insertIndex: index);
+        break;
+      case _SongContextAction.pasteBelow:
+        await _handlePasteSong(kind, insertIndex: index + 1);
+        break;
+      case null:
+        break;
+    }
+  }
+
+  Future<void> _handlePasteSong(
+    PlaylistKind kind, {
+    int? insertIndex,
+  }) async {
+    final data = _clipboard;
+    if (data == null) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Copy a song first.')),
+      );
+      return;
+    }
+    final songRepoNotifier = ref.read(songRepositoryProvider.notifier);
+    final newSong = data.song.copyWith(id: const Uuid().v4());
+    songRepoNotifier.upsert(newSong);
+    final list = _entriesFor(kind);
+    final targetIndex =
+        insertIndex == null ? list.length : insertIndex.clamp(0, list.length);
+    setState(() {
+      list.insert(
+        targetIndex,
+        _EditableSongEntry(
+          song: newSong,
+          ref: SongRef(songId: newSong.id, orderIndex: targetIndex),
+        ),
+      );
+      _reindex(list);
+      _isDirty = true;
+    });
+    final cueRepo = ref.read(cueRepositoryProvider);
+    cueRepo.copyAll(data.song.id, newSong.id);
+    setState(() {
+      _clipboard = null;
+    });
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Pasted "${data.song.title}".')),
+    );
   }
 
   Future<void> _handleBackPressed() async {
@@ -1092,7 +1247,8 @@ Future<({String title, Duration offset})?> _showCueFormDialog({
 }
 
   bool get _canSave =>
-      _nameController.text.trim().isNotEmpty && _workoutSongs.isNotEmpty;
+      _nameController.text.trim().isNotEmpty &&
+      (_preSongs.isNotEmpty || _workoutSongs.isNotEmpty || _postSongs.isNotEmpty);
 }
 class _PlaylistSectionConfig {
   _PlaylistSectionConfig({
@@ -1116,15 +1272,25 @@ class _PlaylistEditor extends StatelessWidget {
   const _PlaylistEditor({
     required this.config,
     required this.onAddSong,
+    required this.canPaste,
+    this.onPasteSong,
     required this.onDeleteSong,
     required this.onReorderSong,
     required this.onEditCues,
+    required this.onEntryLongPress,
   });
   final _PlaylistSectionConfig config;
   final VoidCallback onAddSong;
+  final bool canPaste;
+  final VoidCallback? onPasteSong;
   final void Function(int index) onDeleteSong;
   final void Function(int oldIndex, int newIndex) onReorderSong;
   final void Function(_EditableSongEntry entry) onEditCues;
+  final Future<void> Function(
+    _EditableSongEntry entry,
+    int index,
+    Offset position,
+  ) onEntryLongPress;
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -1189,6 +1355,15 @@ class _PlaylistEditor extends StatelessWidget {
                               ],
                             ),
                           ),
+                        if (canPaste && onPasteSong != null)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: OutlinedButton.icon(
+                              onPressed: onPasteSong,
+                              icon: const Icon(Icons.content_paste),
+                              label: const Text('Paste Song'),
+                            ),
+                          ),
                         FilledButton.icon(
                           onPressed: onAddSong,
                           icon: const Icon(Icons.add),
@@ -1223,10 +1398,27 @@ class _PlaylistEditor extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
+                        ReorderableDelayedDragStartListener(
+                          index: index,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: Icon(
+                              Icons.drag_handle,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
                         Expanded(
-                          child: ReorderableDelayedDragStartListener(
-                            index: index,
-                            child: _PlaylistSongTile(entry: entry),
+                          child: _ReorderableSongTile(
+                            entry: entry,
+                            onShowMenu: (entry, position) =>
+                                onEntryLongPress(entry, index, position),
+                            child: _PlaylistSongTile(
+                              entry: entry,
+                              displayIndex: index,
+                            ),
                           ),
                         ),
                         IconButton(
@@ -1255,9 +1447,11 @@ class _PlaylistEditor extends StatelessWidget {
 class _PlaylistSongTile extends ConsumerWidget {
   const _PlaylistSongTile({
     required this.entry,
+    required this.displayIndex,
   });
 
   final _EditableSongEntry entry;
+  final int displayIndex;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1266,11 +1460,75 @@ class _PlaylistSongTile extends ConsumerWidget {
       orElse: () => 0,
     );
     final cueLabel = cueCount == 1 ? '1 cue' : '$cueCount cues';
+    const indexWidth = 48.0; // supports up to 4 digits with spacing
     return ListTile(
       dense: true,
       contentPadding: EdgeInsets.zero,
-      title: Text('${entry.song.title} • ${entry.song.artist}'),
-      subtitle: Text('$cueLabel • ${durationToMMSS(entry.song.duration)}'),
+      title: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: indexWidth,
+            child: Text(
+              '${displayIndex + 1}',
+              textAlign: TextAlign.left,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '${entry.song.title} • ${entry.song.artist}',
+              textAlign: TextAlign.left,
+            ),
+          ),
+        ],
+      ),
+      subtitle: Padding(
+        padding: EdgeInsets.only(left: indexWidth + 12),
+        child: Text(
+          '$cueLabel • ${durationToMMSS(entry.song.duration)}',
+          textAlign: TextAlign.left,
+        ),
+      ),
+    );
+  }
+}
+
+class _ReorderableSongTile extends StatefulWidget {
+  const _ReorderableSongTile({
+    required this.entry,
+    required this.child,
+    required this.onShowMenu,
+  });
+  final _EditableSongEntry entry;
+  final Widget child;
+  final Future<void> Function(
+    _EditableSongEntry entry,
+    Offset position,
+  ) onShowMenu;
+
+  @override
+  State<_ReorderableSongTile> createState() => _ReorderableSongTileState();
+}
+
+class _ReorderableSongTileState extends State<_ReorderableSongTile> {
+  Offset? _tapPosition;
+
+  void _openMenu(Offset position) {
+    widget.onShowMenu(widget.entry, position);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (details) => _tapPosition = details.globalPosition,
+      onLongPressStart: (details) {
+        final position = _tapPosition ?? details.globalPosition;
+        _openMenu(position);
+      },
+      child: widget.child,
     );
   }
 }
@@ -1289,6 +1547,13 @@ class _EditableSongEntry {
 
 
 
+
+class _ClipboardSong {
+  _ClipboardSong({required this.song});
+  final Song song;
+}
+
+enum _SongContextAction { copy, pasteAbove, pasteBelow }
 
 class _CueControlButton extends StatelessWidget {
   const _CueControlButton({
