@@ -315,32 +315,58 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
             children: [
               TextField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Class name'),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<ConnectorType>(
-            key: ValueKey(connector),
-            initialValue: connector,
-            decoration: const InputDecoration(labelText: 'Music source'),
-            items: const [
-              DropdownMenuItem<ConnectorType>(
-                value: ConnectorType.spotify,
-                child: Text('Spotify'),
+                textAlign: TextAlign.center,
+                decoration: const InputDecoration(
+                  label: Center(child: Text('Class Name')),
+                  floatingLabelAlignment: FloatingLabelAlignment.center,
+                ),
               ),
-              DropdownMenuItem<ConnectorType>(
-                value: ConnectorType.appleMusic,
-                child: Text('Apple Music'),
-              ),
-              DropdownMenuItem<ConnectorType>(
-                value: ConnectorType.webUpload,
-                child: Text('Web Upload'),
-              ),
-            ],
-            onChanged: (value) {
-              if (value != null) {
-                ref.read(selectedConnectorProvider.notifier).state = value;
-              }
-            },
+              const SizedBox(height: 16),
+              DropdownButtonFormField<ConnectorType>(
+                key: ValueKey(connector),
+                initialValue: connector,
+                alignment: Alignment.center,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  label: Center(child: Text('Music Source')),
+                  floatingLabelAlignment: FloatingLabelAlignment.center,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 32),
+                  suffixIcon: Icon(Icons.arrow_drop_down),
+                ),
+                icon: const SizedBox.shrink(),
+                items: const [
+                  DropdownMenuItem<ConnectorType>(
+                    value: ConnectorType.spotify,
+                    child: Center(child: Text('Spotify')),
+                  ),
+                  DropdownMenuItem<ConnectorType>(
+                    value: ConnectorType.appleMusic,
+                    child: Center(child: Text('Apple Music')),
+                  ),
+                  DropdownMenuItem<ConnectorType>(
+                    value: ConnectorType.webUpload,
+                    child: Center(child: Text('Web Upload')),
+                  ),
+                ],
+                selectedItemBuilder: (context) => const [
+                  Align(
+                    alignment: Alignment.center,
+                    child: Text('Spotify', textAlign: TextAlign.center),
+                  ),
+                  Align(
+                    alignment: Alignment.center,
+                    child: Text('Apple Music', textAlign: TextAlign.center),
+                  ),
+                  Align(
+                    alignment: Alignment.center,
+                    child: Text('Web Upload', textAlign: TextAlign.center),
+                  ),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    ref.read(selectedConnectorProvider.notifier).state = value;
+                  }
+                },
           ),
           const SizedBox(height: 24),
               for (final section in sections)
@@ -606,7 +632,9 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                 );
                 final canAdd = selectedIds.isNotEmpty;
                 return AlertDialog(
-                  title: const Text('Add Song'),
+                  title: const Center(
+                    child: Text('Add Song', textAlign: TextAlign.center),
+                  ),
                   content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -614,19 +642,46 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                         DropdownButtonFormField<ConnectorType>(
                           key: ValueKey(connector),
                           initialValue: connector,
-                          decoration: const InputDecoration(labelText: 'Source'),
+                          alignment: Alignment.center,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            label: Center(child: Text('Source')),
+                            floatingLabelAlignment:
+                                FloatingLabelAlignment.center,
+                            contentPadding:
+                                EdgeInsets.symmetric(horizontal: 32),
+                            suffixIcon: Icon(Icons.arrow_drop_down),
+                          ),
+                          icon: const SizedBox.shrink(),
                           items: const [
                             DropdownMenuItem<ConnectorType>(
                               value: ConnectorType.spotify,
-                              child: Text('Spotify'),
+                              child: Center(child: Text('Spotify')),
                             ),
                             DropdownMenuItem<ConnectorType>(
                               value: ConnectorType.appleMusic,
-                              child: Text('Apple Music'),
+                              child: Center(child: Text('Apple Music')),
                             ),
                             DropdownMenuItem<ConnectorType>(
                               value: ConnectorType.webUpload,
-                              child: Text('Web Upload'),
+                              child: Center(child: Text('Web Upload')),
+                            ),
+                          ],
+                          selectedItemBuilder: (context) => const [
+                            Align(
+                              alignment: Alignment.center,
+                              child:
+                                  Text('Spotify', textAlign: TextAlign.center),
+                            ),
+                            Align(
+                              alignment: Alignment.center,
+                              child: Text('Apple Music',
+                                  textAlign: TextAlign.center),
+                            ),
+                            Align(
+                              alignment: Alignment.center,
+                              child: Text('Web Upload',
+                                  textAlign: TextAlign.center),
                             ),
                           ],
                           onChanged: (value) {
@@ -910,7 +965,12 @@ Future<void> _showCueEditorDialog(Song song) async {
                       );
 
                 return AlertDialog(
-                  title: Text('Cues for ${song.title}'),
+                  title: Center(
+                    child: Text(
+                      'Cues for ${song.title}',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
                   content: SizedBox(
                     width: double.maxFinite,
                     height: 420,
@@ -1075,44 +1135,71 @@ class _PlaylistEditor extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        config.title,
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      if (config.totalDurationLabel != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            config.totalDurationLabel!,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.labelMedium,
-                          ),
+            SizedBox(
+              height: config.allowShuffle ? 96 : 64,
+              width: double.infinity,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Align(
+                    alignment: Alignment.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          config.title,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
-                    ],
+                        if (config.totalDurationLabel != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              config.totalDurationLabel!,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.labelMedium,
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: onAddSong,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Add Song'),
-                ),
-              ],
-            ),
-            if (config.allowShuffle)
-              SwitchListTile.adaptive(
-                value: config.shuffleValue,
-                onChanged: config.onShuffleChanged,
-                title: const Text('Shuffle playback'),
+                  Positioned(
+                    right: 0,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (config.allowShuffle)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 12),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Switch.adaptive(
+                                  value: config.shuffleValue,
+                                  onChanged: config.onShuffleChanged,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Shuffle playback',
+                                  style:
+                                      Theme.of(context).textTheme.bodyMedium,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        FilledButton.icon(
+                          onPressed: onAddSong,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add Song'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+            ),
             if (config.entries.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 16),

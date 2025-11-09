@@ -44,22 +44,9 @@ class ClassesListScreen extends ConsumerWidget {
                 final item = classes[index];
                 final workoutCount = item.workoutPlaylist.length;
                 return ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  title: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      item.name,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  subtitle: SizedBox(
-                    width: double.infinity,
-                    child: Text(
-                      'Workout tracks: $workoutCount - Updated ${_formatDate(item.updatedAt)}',
-                      textAlign: TextAlign.center,
-                    ),
+                  title: Text(item.name),
+                  subtitle: Text(
+                    'Workout tracks: $workoutCount - Updated ${_formatDate(item.updatedAt)}',
                   ),
                   trailing: Wrap(
                     spacing: 8,
