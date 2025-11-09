@@ -22,11 +22,6 @@ class HomeScreen extends StatelessWidget {
               title: const Text('Classes'),
               onTap: () => context.go('/classes'),
             ),
-            ListTile(
-              leading: const Icon(Icons.play_circle_outline),
-              title: const Text('Class Player'),
-              onTap: () => context.go('/class-player'),
-            ),
           ],
         ),
       ),

@@ -53,7 +53,8 @@ class ClassesListScreen extends ConsumerWidget {
                     children: [
                       OutlinedButton.icon(
                         onPressed: () {
-                          ref.read(currentClassIdProvider.notifier).state = item.id;
+                          ref.read(currentClassIdProvider.notifier).state =
+                              item.id;
                           context.push(
                             '/class-player',
                             extra: ClassPlayerLaunchArgs(classId: item.id),
@@ -67,6 +68,52 @@ class ClassesListScreen extends ConsumerWidget {
                             context.push('/create-class', extra: item.id),
                         icon: const Icon(Icons.edit),
                         label: const Text('Edit'),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete class',
+                        onPressed: () async {
+                          final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('Delete class?'),
+                                  content: Text(
+                                    'Delete "${item.name}" and all associated data?',
+                                  ),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text('Cancel'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .error,
+                                        foregroundColor: Theme.of(context)
+                                            .colorScheme
+                                            .onError,
+                                      ),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              ) ??
+                              false;
+                          if (!confirmed || !context.mounted) return;
+                          ref.read(classesProvider.notifier).delete(item.id);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Deleted "${item.name}"'),
+                            ),
+                          );
+                        },
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: Theme.of(context).colorScheme.error,
+                        ),
                       ),
                     ],
                   ),
