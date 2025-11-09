@@ -1076,21 +1076,30 @@ class _PlaylistEditor extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
-                  child: Text(
-                    config.title,
-                    style: Theme.of(context).textTheme.titleLarge,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        config.title,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      if (config.totalDurationLabel != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            config.totalDurationLabel!,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.labelMedium,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                if (config.totalDurationLabel != null)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: Text(
-                      config.totalDurationLabel!,
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ),
                 FilledButton.icon(
                   onPressed: onAddSong,
                   icon: const Icon(Icons.add),
@@ -1215,4 +1224,3 @@ class _CueControlButton extends StatelessWidget {
     );
   }
 }
-
