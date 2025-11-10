@@ -1,10 +1,33 @@
 import 'dart:async';
 
 import 'package:cycle_coach/shared/models/cue_card.dart';
+import 'package:cycle_coach/shared/services/local_storage_service.dart';
 
 class CueRepository {
+  CueRepository(this._storage) {
+    _hydrate();
+  }
+
+  final LocalStorageService _storage;
+
   final Map<String, List<CueCard>> _store = {};
   final Map<String, StreamController<List<CueCard>>> _controllers = {};
+
+  Future<void> _hydrate() async {
+    final stored = await _storage.loadCues();
+    if (stored.isNotEmpty) {
+      _store
+        ..clear()
+        ..addAll(stored);
+      for (final songId in stored.keys) {
+        _emit(songId);
+      }
+    }
+  }
+
+  Future<void> _persist() async {
+    await _storage.saveCues(_store);
+  }
 
   List<CueCard> list(String songId) {
     return List.unmodifiable(_store[songId] ?? const <CueCard>[]);
@@ -28,6 +51,7 @@ class CueRepository {
     cues.sort((a, b) => a.offset.compareTo(b.offset));
     _store[songId] = cues;
     _emit(songId);
+    _persist();
   }
 
   void update(String songId, CueCard cue) {
@@ -40,6 +64,7 @@ class CueRepository {
     cues.sort((a, b) => a.offset.compareTo(b.offset));
     _store[songId] = cues;
     _emit(songId);
+    _persist();
   }
 
   void remove(String songId, String cueId) {
@@ -47,12 +72,14 @@ class CueRepository {
     cues.removeWhere((cue) => cue.id == cueId);
     _store[songId] = cues;
     _emit(songId);
+    _persist();
   }
 
   void copyAll(String fromSongId, String toSongId) {
     final source = List<CueCard>.from(_store[fromSongId] ?? const <CueCard>[]);
     _store[toSongId] = source.map((cue) => cue.copyWith()).toList();
     _emit(toSongId);
+    _persist();
   }
 
   void _emit(String songId) {
@@ -62,4 +89,3 @@ class CueRepository {
     }
   }
 }
-

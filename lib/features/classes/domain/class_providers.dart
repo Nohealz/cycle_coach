@@ -7,9 +7,37 @@ import 'package:cycle_coach/features/classes/domain/models/song_ref.dart';
 import 'package:cycle_coach/shared/data/song_repository.dart';
 import 'package:cycle_coach/shared/music/connector.dart';
 import 'package:cycle_coach/shared/models/song.dart';
+import 'package:cycle_coach/shared/services/local_storage_service.dart';
 
 final selectedConnectorProvider =
-    StateProvider<ConnectorType>((Ref ref) => ConnectorType.spotify);
+    StateNotifierProvider<SelectedConnectorNotifier, ConnectorType>(
+  (ref) => SelectedConnectorNotifier(ref),
+);
+
+class SelectedConnectorNotifier extends StateNotifier<ConnectorType> {
+  SelectedConnectorNotifier(this._ref) : super(ConnectorType.spotify) {
+    _hydrate();
+  }
+
+  final Ref _ref;
+
+  LocalStorageService get _storage => _ref.read(localStorageServiceProvider);
+
+  Future<void> _hydrate() async {
+    final stored = await _storage.loadLastConnector();
+    if (stored != null) {
+      state = stored;
+    }
+  }
+
+  Future<void> select(ConnectorType connector) async {
+    if (state == connector) {
+      return;
+    }
+    state = connector;
+    await _storage.saveLastConnector(connector);
+  }
+}
 
 final currentClassIdProvider = StateProvider<String?>((_) => null);
 

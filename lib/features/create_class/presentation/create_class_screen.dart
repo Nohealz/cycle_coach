@@ -142,6 +142,9 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
         _reindex(list);
         _isDirty = true;
       });
+      await ref
+          .read(selectedConnectorProvider.notifier)
+          .select(selectedConnector);
     }
     Future<void> handleEditCues(
       PlaylistKind playlist,
@@ -378,7 +381,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                 ],
                 onChanged: (value) {
                   if (value != null) {
-                    ref.read(selectedConnectorProvider.notifier).state = value;
+                    ref.read(selectedConnectorProvider.notifier).select(value);
                   }
                 },
           ),
@@ -450,6 +453,18 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
       case ConnectorType.webUpload:
         return 'web';
     }
+  }
+
+  ConnectorType? _sourceToConnector(String source) {
+    switch (source) {
+      case 'spotify':
+        return ConnectorType.spotify;
+      case 'apple':
+        return ConnectorType.appleMusic;
+      case 'web':
+        return ConnectorType.webUpload;
+    }
+    return null;
   }
 
   String _formatPlaylistDuration(Duration duration) {
@@ -719,6 +734,10 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     setState(() {
       _clipboard = null;
     });
+    final connector = _sourceToConnector(newSong.source);
+    if (connector != null) {
+      await ref.read(selectedConnectorProvider.notifier).select(connector);
+    }
     if (!mounted) {
       return;
     }
@@ -894,7 +913,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                               });
                               dialogRef
                                   .read(selectedConnectorProvider.notifier)
-                                  .state = value;
+                                  .select(value);
                             }();
                           },
                         ),

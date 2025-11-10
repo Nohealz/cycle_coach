@@ -3,9 +3,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:cycle_coach/features/classes/data/cue_repo.dart';
 import 'package:cycle_coach/shared/models/cue_card.dart';
 import 'package:cycle_coach/shared/services/audio_player_service.dart';
+import 'package:cycle_coach/shared/services/local_storage_service.dart';
 
 final cueRepositoryProvider = Provider<CueRepository>((ref) {
-  return CueRepository();
+  final storage = ref.watch(localStorageServiceProvider);
+  return CueRepository(storage);
 });
 
 final cueListProvider = StreamProvider.autoDispose.family<List<CueCard>, String>(
