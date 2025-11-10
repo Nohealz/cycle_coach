@@ -15,6 +15,7 @@ import 'package:cycle_coach/shared/models/song.dart';
 import 'package:cycle_coach/shared/models/cue_card.dart';
 import 'package:cycle_coach/shared/utils/formatting.dart';
 import 'package:cycle_coach/shared/music/connector.dart';
+import 'package:cycle_coach/shared/music/connectors/connector_registry.dart';
 
 class CreateClassScreen extends ConsumerStatefulWidget {
   const CreateClassScreen({super.key, this.classId});
@@ -488,6 +489,9 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     if (confirm != true) {
       return;
     }
+    if (!mounted) {
+      return;
+    }
 
     final cueRepo = ref.read(cueRepositoryProvider);
     final songIds = <String>{
@@ -512,6 +516,34 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     });
   }
 
+  Future<bool> _ensureConnectorAuthorized(ConnectorType connectorType) async {
+    final connector = ref.read(musicConnectorProvider(connectorType));
+    if (!connector.isSupported) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              connector.unsupportedMessage ??
+                  '${connector.name} is not available on this device.',
+            ),
+          ),
+        );
+      }
+      return false;
+    }
+    try {
+      await connector.ensureAuthorized();
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to authorize ${connector.name}: $error')),
+        );
+      }
+      return false;
+    }
+  }
+
   void _reindex(List<_EditableSongEntry> entries) {
     for (var i = 0; i < entries.length; i++) {
       entries[i] = entries[i].copyWith(
@@ -520,7 +552,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     }
   }
   void _handleNameChanged() {
-    if (!context.mounted) {
+    if (!mounted) {
       return;
     }
     setState(() {
@@ -711,6 +743,12 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
   Future<({ConnectorType connector, List<SongModel> songs})?>
       _showAddSongDialog(BuildContext context, Set<String> existingSongIds) async {
     var connector = ref.read(selectedConnectorProvider);
+    if (!await _ensureConnectorAuthorized(connector)) {
+      return null;
+    }
+    if (!context.mounted) {
+      return null;
+    }
     final result =
         await showDialog<({ConnectorType connector, List<SongModel> songs})?>(
       context: context,
@@ -840,7 +878,16 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                             ),
                           ],
                           onChanged: (value) {
-                            if (value != null) {
+                            if (value == null) {
+                              return;
+                            }
+                            () async {
+                              if (!await _ensureConnectorAuthorized(value)) {
+                                return;
+                              }
+                              if (!context.mounted) {
+                                return;
+                              }
                               setStateDialog(() {
                                 connector = value;
                                 selectedIds.clear();
@@ -848,7 +895,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
                               dialogRef
                                   .read(selectedConnectorProvider.notifier)
                                   .state = value;
-                            }
+                            }();
                           },
                         ),
                         const SizedBox(height: 16),
