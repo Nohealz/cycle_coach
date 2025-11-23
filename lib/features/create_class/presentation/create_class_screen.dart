@@ -32,12 +32,20 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
   final List<_EditableSongEntry> _postSongs = [];
   ClassModel? _originalClass;
   bool _isDirty = false;
+  ProviderSubscription<Map<String, Song>>? _songSubscription;
   _ClipboardSong? _clipboard;
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController()
       ..addListener(_handleNameChanged);
+    _songSubscription =
+        ref.listenManual<Map<String, Song>>(songRepositoryProvider, (_, next) {
+      if (next.isEmpty) {
+        return;
+      }
+      _rehydratePlaylistsIfNeeded();
+    });
   }
   @override
   void didChangeDependencies() {
@@ -56,13 +64,35 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
     }
   }
   void _hydrateFromClass(ClassModel model) {
-    _nameController.text = model.name;
-    _shufflePre = model.shufflePre;
-    _shufflePost = model.shufflePost;
-    final songMap = ref.read(songRepositoryProvider);
-    _fillEntries(_preSongs, model.prePlaylist, songMap);
-    _fillEntries(_workoutSongs, model.workoutPlaylist, songMap);
-    _fillEntries(_postSongs, model.postPlaylist, songMap);
+    setState(() {
+      _nameController.text = model.name;
+      _shufflePre = model.shufflePre;
+      _shufflePost = model.shufflePost;
+      final songMap = ref.read(songRepositoryProvider);
+      _fillEntries(_preSongs, model.prePlaylist, songMap);
+      _fillEntries(_workoutSongs, model.workoutPlaylist, songMap);
+      _fillEntries(_postSongs, model.postPlaylist, songMap);
+      _isDirty = false;
+    });
+  }
+
+  void _rehydratePlaylistsIfNeeded() {
+    if (_originalClass == null || _isDirty) {
+      return;
+    }
+    final originalCount =
+        _originalClass!.prePlaylist.length +
+        _originalClass!.workoutPlaylist.length +
+        _originalClass!.postPlaylist.length;
+    if (originalCount == 0) {
+      return;
+    }
+    final currentCount =
+        _preSongs.length + _workoutSongs.length + _postSongs.length;
+    if (currentCount == originalCount) {
+      return;
+    }
+    _hydrateFromClass(_originalClass!);
   }
   void _fillEntries(
     List<_EditableSongEntry> target,
@@ -88,6 +118,7 @@ class _CreateClassScreenState extends ConsumerState<CreateClassScreen> {
   void dispose() {
     _nameController.removeListener(_handleNameChanged);
     _nameController.dispose();
+    _songSubscription?.close();
     super.dispose();
   }
   @override

@@ -1,6 +1,7 @@
 import 'dotenv/config.js';
 import express from 'express';
 import helmet from 'helmet';
+import cors from 'cors';
 import { createAppleMusicToken } from './token.js';
 
 const app = express();
@@ -11,6 +12,20 @@ app.use(
     crossOriginResourcePolicy: false,
   }),
 );
+
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
+  : '*';
+
+app.use(
+  cors({
+    origin: corsOrigins,
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type'],
+  }),
+);
+
+app.options('/v1/apple-music/token', cors());
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, timestamp: new Date().toISOString() });

@@ -26,4 +26,4 @@ Any Node host works. For Render:
 - Root Directory: `server`
 - Build Command: `npm install`
 - Start Command: `npm start`
-- Environment variables: `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_PRIVATE_KEY`, optional `APPLE_MUSIC_TOKEN_TTL_SECONDS`.
+- Environment variables: `APPLE_MUSIC_TEAM_ID`, `APPLE_MUSIC_KEY_ID`, `APPLE_MUSIC_PRIVATE_KEY`, optional `APPLE_MUSIC_TOKEN_TTL_SECONDS`, optional `CORS_ORIGIN`.
