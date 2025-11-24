@@ -34,7 +34,12 @@
 </head>
 <body>
   <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"></script>
-  <script src="music_kit_helper.js"></script>
+  <script>
+    document.addEventListener('musickitloaded', () => {
+      window.musicKitReady = true;
+      console.log('MusicKit fully loaded');
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

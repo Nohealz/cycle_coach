@@ -6,20 +6,22 @@ import 'package:http/http.dart' as http;
 import 'package:cycle_coach/shared/data/song_model.dart';
 import 'package:cycle_coach/shared/services/apple_music_auth_service.dart';
 
-import 'apple_music_web_adapter.dart';
 import 'music_connector.dart';
+import 'apple_music_web_adapter.dart';
 
 class AppleMusicConnector extends MusicConnector {
   AppleMusicConnector(
     this._authService, {
     http.Client? httpClient,
     AppleMusicWebAdapter? webAdapter,
-  })  : _client = httpClient ?? http.Client(),
-        _webAdapter = webAdapter ?? (kIsWeb ? AppleMusicWebAdapter() : null);
+  }) : _client = httpClient ?? http.Client(),
+       _webAdapter = webAdapter ?? (kIsWeb ? AppleMusicWebAdapter() : null);
 
   final AppleMusicAuthService _authService;
   final http.Client _client;
   final AppleMusicWebAdapter? _webAdapter;
+
+  bool _webAuthorized = false;
 
   bool get _isSupported {
     if (kIsWeb) {
@@ -46,23 +48,30 @@ class AppleMusicConnector extends MusicConnector {
     if (!_isSupported) {
       throw UnsupportedError(unsupportedMessage ?? 'Not supported.');
     }
+    debugPrint('[AppleMusic] ensureAuthorized start (web=$kIsWeb)');
     final adapter = _webAdapter;
     if (kIsWeb && adapter != null) {
       final token = await _authService.getDeveloperToken();
       await adapter.ensureConfigured(token);
       await adapter.authorize();
+      _webAuthorized = true;
+      debugPrint('[AppleMusic] ensureAuthorized complete (web)');
       return;
     }
     await _authService.ensureAuthorized();
+    debugPrint('[AppleMusic] ensureAuthorized complete (native)');
   }
 
   @override
   Future<List<SongModel>> fetchInitialCatalog() async {
+    debugPrint('[AppleMusic] fetchInitialCatalog start (web=$kIsWeb)');
     final adapter = _webAdapter;
     if (kIsWeb && adapter != null) {
-      final token = await _authService.getDeveloperToken();
-      await adapter.ensureConfigured(token);
+      if (!_webAuthorized) {
+        await ensureAuthorized();
+      }
       final charts = await adapter.fetchCharts();
+      debugPrint('[AppleMusic] fetchInitialCatalog got charts');
       return _parseChartSongs(charts);
     }
     return _fetchChartsViaRest();
@@ -70,11 +79,14 @@ class AppleMusicConnector extends MusicConnector {
 
   @override
   Future<List<SongModel>> search(String query) async {
+    debugPrint('[AppleMusic] search start (web=$kIsWeb) query="$query"');
     final adapter = _webAdapter;
     if (kIsWeb && adapter != null) {
-      final token = await _authService.getDeveloperToken();
-      await adapter.ensureConfigured(token);
+      if (!_webAuthorized) {
+        await ensureAuthorized();
+      }
       final result = await adapter.search(query);
+      debugPrint('[AppleMusic] search got results');
       return _parseSearchSongs(result);
     }
     return _searchViaRest(query);
@@ -82,15 +94,15 @@ class AppleMusicConnector extends MusicConnector {
 
   Future<List<SongModel>> _fetchChartsViaRest() async {
     final token = await _authService.getDeveloperToken();
-    final uri = Uri.https(
-      'api.music.apple.com',
-      '/v1/catalog/us/charts',
-      {'types': 'songs', 'limit': '20'},
-    );
+    final uri = Uri.https('api.music.apple.com', '/v1/catalog/us/charts', {
+      'types': 'songs',
+      'limit': '20',
+    });
     try {
-      final response = await _client.get(uri, headers: {
-        'Authorization': 'Bearer $token',
-      });
+      final response = await _client.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
       if (response.statusCode != 200) {
         throw StateError(
           'Apple Music request failed (${response.statusCode}): ${response.body}',
@@ -106,19 +118,16 @@ class AppleMusicConnector extends MusicConnector {
 
   Future<List<SongModel>> _searchViaRest(String query) async {
     final token = await _authService.getDeveloperToken();
-    final uri = Uri.https(
-      'api.music.apple.com',
-      '/v1/catalog/us/search',
-      {
-        'term': query,
-        'types': 'songs',
-        'limit': '25',
-      },
-    );
+    final uri = Uri.https('api.music.apple.com', '/v1/catalog/us/search', {
+      'term': query,
+      'types': 'songs',
+      'limit': '25',
+    });
     try {
-      final response = await _client.get(uri, headers: {
-        'Authorization': 'Bearer $token',
-      });
+      final response = await _client.get(
+        uri,
+        headers: {'Authorization': 'Bearer $token'},
+      );
       if (response.statusCode != 200) {
         throw StateError(
           'Apple Music search failed (${response.statusCode}): ${response.body}',
@@ -137,7 +146,8 @@ class AppleMusicConnector extends MusicConnector {
     final songs = results['songs'] as List<dynamic>? ?? const [];
     final List<SongModel> output = [];
     for (final entry in songs) {
-      final data = (entry as Map<String, dynamic>)['data'] as List<dynamic>? ?? const [];
+      final data =
+          (entry as Map<String, dynamic>)['data'] as List<dynamic>? ?? const [];
       for (final song in data) {
         final model = _mapSong(song as Map<String, dynamic>);
         if (model != null) {
@@ -167,9 +177,11 @@ class AppleMusicConnector extends MusicConnector {
     final artist = attributes['artistName'] as String?;
     final durationMs = attributes['durationInMillis'] as int?;
     final previews = attributes['previews'] as List<dynamic>? ?? const [];
-    final previewUrl =
-        previews.isNotEmpty ? previews.first['url'] as String? : null;
-    final id = payload['id'] as String? ??
+    final previewUrl = previews.isNotEmpty
+        ? previews.first['url'] as String?
+        : null;
+    final id =
+        payload['id'] as String? ??
         attributes['playParams']?['id'] as String? ??
         name;
     if (id == null || name == null || artist == null) {
