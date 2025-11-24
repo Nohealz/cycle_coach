@@ -6,6 +6,7 @@ const KEY_ID = process.env.APPLE_MUSIC_KEY_ID;
 const TOKEN_TTL_SECONDS = Number(
   process.env.APPLE_MUSIC_TOKEN_TTL_SECONDS ?? 60 * 60 * 24 * 7,
 );
+const BUNDLE_ID = process.env.APPLE_MUSIC_BUNDLE_ID ?? 'com.electrotraide.cycle-coach';
 
 let cachedToken = null;
 let cachedExpiry = 0;
@@ -38,6 +39,7 @@ export function createAppleMusicToken() {
     iat: now,
     exp: now + TOKEN_TTL_SECONDS,
     aud: 'https://music.apple.com',
+    bid: BUNDLE_ID,
   };
 
   const privateKey = getPrivateKey();
