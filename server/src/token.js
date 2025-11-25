@@ -33,12 +33,12 @@ export function createAppleMusicToken() {
     };
   }
 
-  const payload = {
-    iss: TEAM_ID,
-    iat: now,
-    exp: now + TOKEN_TTL_SECONDS,
-    aud: 'https://music.apple.com',
-  };
+const payload = {
+  iss: TEAM_ID,
+  iat: now,
+  exp: now + TOKEN_TTL_SECONDS,
+  // Apple Music requires only iss/iat/exp; no bid/aud/extra claims.
+};
 
   const privateKey = getPrivateKey();
   const token = jwt.sign(payload, privateKey, {
