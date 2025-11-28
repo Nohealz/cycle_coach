@@ -33,12 +33,49 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"></script>
+  <script
+    src="https://js-cdn.music.apple.com/musickit/v3/musickit.js"
+    data-prevent-reload="true"
+    crossorigin="anonymous">
+  </script>
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self' https: data: blob:;
+    script-src 'self' 'unsafe-inline' https://js-cdn.music.apple.com;
+    connect-src 'self'
+      https://api.music.apple.com
+      https://play-edge.itunes.apple.com
+      https://amp-services.itunes.apple.com
+      https://js-cdn.music.apple.com
+      https://play.itunes.apple.com;
+    img-src 'self' https: data: blob:;
+    media-src 'self' https: blob:;
+    frame-src 'self' https://idmsa.apple.com;
+    style-src 'self' 'unsafe-inline' 'unsafe-eval';
+  ">
+  <meta name="referrer" content="origin-when-cross-origin">
   <script>
-    document.addEventListener('musickitloaded', () => {
-      window.musicKitReady = true;
-      console.log('MusicKit fully loaded');
-    });
+    (function() {
+      if (window.MusicKitLoaded) return;
+      window.MusicKitLoaded = true;
+
+      document.addEventListener('musickitloaded', () => {
+        console.log('MusicKit v3 loaded once and locked');
+        window.musicKitReady = true;
+      });
+
+      // Block any duplicate musickit.js injections (Flutter devtools / hot reload).
+      const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+          mutation.addedNodes.forEach((node) => {
+            if (node.tagName === 'SCRIPT' && node.src && node.src.includes('musickit.js')) {
+              console.warn('Blocked duplicate MusicKit load');
+              node.remove();
+            }
+          });
+        });
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>

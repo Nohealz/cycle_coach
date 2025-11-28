@@ -70,9 +70,10 @@ class AppleMusicConnector extends MusicConnector {
       if (!_webAuthorized) {
         await ensureAuthorized();
       }
-      final charts = await adapter.fetchCharts();
-      debugPrint('[AppleMusic] fetchInitialCatalog got charts');
-      return _parseChartSongs(charts);
+      // For web, prefer showing the user's playlists instead of charts.
+      await adapter.fetchMyPlaylists();
+      debugPrint('[AppleMusic] fetchInitialCatalog loaded playlists (no chart songs returned)');
+      return const <SongModel>[];
     }
     return _fetchChartsViaRest();
   }
